@@ -1,9 +1,3 @@
+import { GearBox } from './gearbox';
 
-import { GearBox } from './core/gearbox';
-
-((sandbox) => {
-
-
-
-})(new GearBox());
-
+((sandbox) => {})(new GearBox());

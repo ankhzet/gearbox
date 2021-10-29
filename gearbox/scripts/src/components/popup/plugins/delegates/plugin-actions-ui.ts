@@ -1,6 +1,5 @@
-
-import { Plugin } from '../../../../core/plugin';
+import { Plugin } from '../../../../gearbox';
 
 export interface PluginActionsUIDelegate<P extends Plugin> {
-	executePlugin(uid: string);
+    executePlugin(uid: string);
 }

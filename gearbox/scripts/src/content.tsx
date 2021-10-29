@@ -1,73 +1,76 @@
-
-import { ClientPort } from './core/parcel/parcel';
-import { GearBoxActions } from './core/actions/actions';
-import { Packet } from './core/parcel/packet';
-import { ExecuteAction, ExecutePacketData } from './core/actions/execute';
+import { ClientPort, Packet } from './core';
+import { GearBoxActions, ExecuteAction, ExecutePacketData } from './gearbox';
 
 class ConnectorChannel extends ClientPort {
+    constructor() {
+        super('gearbox-content');
+        this.on(ExecuteAction, this.executed.bind(this));
 
-	constructor() {
-		super('gearbox');
-		this.on(ExecuteAction, this.executed.bind(this));
+        if (!this.rebind()) {
+            throw new Error('Failed to connect to background script');
+        }
+    }
 
-		if (!this.rebind()) {
-			throw new Error('Failed to connect to background script');
-		}
-	}
+    notifyDisconnect() {
+        if (!this.port) {
+            return;
+        }
 
-	notifyDisconnect() {
-		if (!this.port)
-			return;
+        // Actions.postpone(this, 'clear');
+    }
 
-		// Actions.postpone(this, 'clear');
-	}
+    executed(sender, { plugin, code }: { plugin: any; code?: string }, packet: Packet<ExecutePacketData>) {
+        console.log('executing', plugin, code, packet);
 
-	executed(sender, { plugin, code }, packet: Packet<ExecutePacketData>) {
-		console.log('executing', plugin, code, packet);
+        const handler = eval(`(context, args) => (${code}).apply(context, args)`);
 
-		let handler = eval(`(context, args) => (${code}).apply(context, args)`);
-
-		return handler(
-			plugin,
-			[{
-				dom: document,
-				fire: (event, ...args) => GearBoxActions.fire(this, { sender: plugin.uid, event }),
-				unmount: () => GearBoxActions.unmount(this, { uid: plugin.uid }),
-			}]
-		);
-	}
-
+        return handler(plugin, [
+            {
+                dom: document,
+                fire: (event, ...payload) => GearBoxActions.fire(this, { sender: plugin.uid, event, payload }),
+                unmount: () => GearBoxActions.unmount(this, { uid: plugin.uid }),
+            },
+        ]);
+    }
 }
 
 ((channel, interval) => {
-	console.log('Injecting GearBox...');
-	window.onbeforeunload = function (e) {
-		return channel.notifyDisconnect();
-	};
+    console.log('Injecting GearBox...');
 
-	let timer;
-	let checker = () => {
-		let prev = channel.touched;
-		let delta = (+new Date) - prev;
-		if ((delta > interval) || !prev) {
-			if (prev)
-				console.log(`Last request ${delta} msec ago (${interval} delay for reconnect)`);
+    window.onbeforeunload = function () {
+        return channel.notifyDisconnect();
+    };
 
-			if (!channel.rebind()) {
-				console.log('Failed to connect to extension, reloading');
-				window.location.reload();
-			}
-		}
+    let timer;
+    const checker = () => {
+        const prev = channel.touched;
+        const delta = +new Date() - prev;
 
-		if (interval && !timer)
-			timer = window.setInterval(checker, interval / 10);
-	};
+        console.log('[GB]', 'touched:', prev);
 
-	if (document.readyState === 'complete') {
-		checker();
-	} else
-		window.onload = () => {
-			checker();
-		}
+        if (delta > interval || !prev) {
+            if (prev) {
+                console.log(`[GB]`, `Last request ${delta} msec ago (${interval} delay for reconnect)`);
+            }
 
-})(new ConnectorChannel(), 0);// 60 * 1000);
+            if (!channel.rebind()) {
+                console.log('[GB]', 'Failed to connect to extension, reloading');
+                window.location.reload();
+            } else {
+                console.log('[GB]', 'Bound port');
+            }
+        }
+
+        if (interval && !timer) {
+            timer = window.setInterval(checker, interval / 10);
+        }
+    };
+
+    if (document.readyState === 'complete') {
+        checker();
+    } else {
+        window.onload = () => {
+            checker();
+        };
+    }
+})(new ConnectorChannel(), 60 * 1000);

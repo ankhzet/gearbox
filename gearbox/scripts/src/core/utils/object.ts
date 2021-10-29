@@ -1,7 +1,7 @@
 
 export class ObjectUtils {
 
-	static extract<T>(o: T, keys: (string|number)[] = null): T {
+	static extract<T>(o: T, keys?: (string|number)[]): T {
 		let n = <T>{};
 
 		for (let key of keys || Object.keys(o))

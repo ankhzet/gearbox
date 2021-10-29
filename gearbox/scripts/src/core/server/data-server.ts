@@ -1,161 +1,128 @@
+import { Identifiable, Package } from '../common';
+import { DB, ModelStore, SyncResult } from '../db';
+import { ClientPort, Actions, PacketHandler } from '../parcel';
+import { FetchAction, FetchPacketData } from '../parcel';
+import { UpdateAction, UpdatePacketData } from '../parcel';
+import { SendPacketData } from '../parcel';
+import { EntityPacker } from './entity-packer';
 
-import { DB } from '../db/db';
-import { ClientPort } from '../parcel/parcel';
-import { Actions } from '../parcel/actions/actions';
-import { PacketHandler } from '../parcel/dispatcher';
-import { Packet } from '../parcel/packet';
-import { FetchAction, FetchPacketData } from '../parcel/actions/fetch';
-import { UpdateAction, UpdatePacketData } from '../parcel/actions/update';
-import { SendPacketData } from '../parcel/actions/send';
-import { ModelStore, SyncResult } from '../gearbox-db';
-
-export type Serializer = (data: any) => any;
-
-export type Mapper = (data: Package<any>) => Package<any>;
-
-export type Updatable = (store: ModelStore, data: SyncResult) => any;
+export type Serializer<I, O> = (data: I) => O;
+export type PackageMapper<I extends Identifiable, O extends Identifiable> = (data: Package<I>) => Package<O>;
+export type Updatable = (store: ModelStore, data: SyncResult) => void;
 
 export interface Container<T> {
-	[name: string]: T;
-}
-
-export interface Package<T extends Identifiable> {
-	[uid: string]: T;
-}
-
-export interface Identifiable {
-	uid: string;
+    [name: string]: T;
 }
 
 export class DataServer {
-	db: DB;
-	private _cache: Container<Package<any>> = {};
-	mappers: Container<Mapper> = {};
-	updatables: Container<Updatable> = {};
+    private _cache: Container<Package> = {};
+    db: DB;
+    mappers: Container<PackageMapper<Identifiable, Identifiable>> = {};
+    updatables: Container<Updatable> = {};
 
-	packer: EntityPacker = new EntityPacker();
+    packer: EntityPacker = new EntityPacker();
 
-	constructor(handler: PacketHandler<ClientPort>, db: DB) {
-		this.db = db;
+    constructor(handler: PacketHandler<ClientPort>, db: DB) {
+        this.db = db;
 
-		handler.on(FetchAction, this.fetch.bind(this));
-		handler.on(UpdateAction, this.update.bind(this));
-	}
+        handler.on(FetchAction, this.fetch.bind(this));
+        handler.on(UpdateAction, this.update.bind(this));
+    }
 
-	registerSerializer(name: string, serializer: Serializer) {
-		return this.packer.registerSerializer(name, serializer);
-	}
+    registerSerializer(name: string, serializer: Serializer<Identifiable, Identifiable>) {
+        return this.packer.registerSerializer(name, serializer);
+    }
 
-	registerMapper(name: string, mapper: Mapper) {
-		return this.mappers[name] = mapper;
-	}
+    registerMapper(name: string, mapper: PackageMapper<Identifiable, Identifiable>) {
+        return (this.mappers[name] = mapper);
+    }
 
-	registerUpdatable(name: string, updatable: Updatable) {
-		return this.updatables[name] = updatable;
-	}
+    registerUpdatable(name: string, updatable: Updatable) {
+        return (this.updatables[name] = updatable);
+    }
 
-	cache(what: string, data: Package<any>) {
-		let store = this._cache[what];
-		if (!store)
-			store = this._cache[what] = {};
+    cache(what: string, data: Package) {
+        let store = this._cache[what];
 
-		let mapped = this.mapped(what, data);
-		for (let uid in mapped) {
-			let fragment = mapped[uid];
-			if (fragment)
-				store[uid] = fragment;
-			else
-				if (store[uid])
-					delete store[uid];
-		}
+        if (!store) {
+            store = this._cache[what] = {};
+        }
 
-		return mapped;
-	}
+        const mapped = this.mapped(what, data);
 
-	cached<I extends Identifiable>(what: string): Package<I> {
-		let cache = this._cache[what];
-		if (!cache)
-			return <Package<I>>{};
+        for (const uid in mapped) {
+            const fragment = mapped[uid];
 
-		return this.mapped(what, cache);
-	}
+            if (fragment) {
+                store[uid] = fragment;
+            } else if (store[uid]) {
+                delete store[uid];
+            }
+        }
 
-	mapped(what: string, data: Package<any>): Package<any> {
-		let mapper = this.mappers[what];
-		return mapper
-			? mapper(data)
-			: data;
-	}
+        return mapped;
+    }
 
-	fetch(client: ClientPort, { what, query, payload: requestID }: FetchPacketData, packet: Packet<FetchPacketData>) {
-		let sender = (data: Package<Identifiable>) => {
-			return this.send(client, {
-				what,
-				data: this.packer.pack(what, data),
-				payload: requestID
-			}, packet);
-		};
+    cached<I extends Identifiable>(what: string): Package<I> {
+        const cache = this._cache[what];
 
+        return cache ? this.mapped(what, cache) : <Package<I>>{};
+    }
 
-		this.db.query(what, query)
-			.specific(
-				Object.keys(this.cache),
-				() => sender(this.cached(what))
-			)
-			.fetch((err, data: any[]) => {
-				let pack = <Package<Identifiable>>{};
-				for (let fragment of data)
-					pack[fragment.uid] = fragment;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mapped(what: string, data: Package<any>): Package<any> {
+        const mapper = this.mappers[what];
 
-				return sender(this.cache(what, pack));
-			});
-	}
+        return mapper ? mapper(data) : data;
+    }
 
-	update(client: ClientPort, { what, data, payload: requestID }: UpdatePacketData, packet: Packet<UpdatePacketData>) {
-		this.db.query(what)
-			.specific(null, (table) => {
-				let store = new ModelStore(table);
+    fetch(client: ClientPort, { what, query, payload: requestID }: FetchPacketData) {
+        const sender = (data: Package) => {
+            return this.send(client, {
+                what,
+                data: this.packer.pack(what, data),
+                payload: requestID,
+            });
+        };
 
-				store.syncModels(data)
-					.then((result: SyncResult) => {
-						let updatable = this.updatables[what];
-						if (updatable)
-							updatable(store, result);
+        this.db
+            .query(what, query)
+            .specific(Object.keys(this.cache), () => sender(this.cached(what)))
+            .fetch<Identifiable>()
+            .then((data: Identifiable[]) => {
+                const pack = <Package>{};
 
-						this.send(client, { what, data: result.request, payload: requestID }, packet);
-					})
-					.catch((error) => {
-						console.log(`Failed to update "${what}" with data:\n`, data);
-						throw new Error(`Failed to update "${what}":\n${error}`);
-					});
-			});
-	}
+                for (const fragment of data) {
+                    pack[fragment.uid] = fragment;
+                }
 
-	send(client: ClientPort, data: SendPacketData, packet) {
-		return Actions.send(client, data);
-	}
+                return sender(this.cache(what, pack));
+            });
+    }
 
-}
+    update(client: ClientPort, { what, data, payload: requestID }: UpdatePacketData) {
+        this.db.query(what).specific(null, (table) => {
+            const store = new ModelStore(table);
 
-abstract class Packer<T extends Identifiable, R> {
-	serializers: Container<Serializer> = {};
+            store
+                .syncModels(data)
+                .then((result: SyncResult) => {
+                    const updatable = this.updatables[what];
 
-	registerSerializer(name: string, serializer: Serializer) {
-		this.serializers[name] = serializer;
-	}
+                    if (updatable) {
+                        updatable(store, result);
+                    }
 
-	abstract pack(what: string, data: Package<T>): R;
-}
+                    this.send(client, { what, data: result.request, payload: requestID });
+                })
+                .catch((error) => {
+                    console.log(`Failed to update "${what}" with data:\n`, data);
+                    throw new Error(`Failed to update "${what}":\n${error}`);
+                });
+        });
+    }
 
-class EntityPacker extends Packer<Identifiable, any[]> {
-
-	pack(what: string, data: Package<Identifiable>): any[] {
-		let serializer = this.serializers[what];
-
-		let uids = Object.keys(data);
-		return serializer
-			? uids.map((key) => serializer(data[key]))
-			: uids.map((key) => data[key]);
-	}
-
+    send(client: ClientPort, data: SendPacketData) {
+        return Actions.send(client, data);
+    }
 }

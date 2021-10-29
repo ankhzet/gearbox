@@ -1,43 +1,53 @@
-
 import { ClientPort } from './parcel';
 
 export class ClientsPool<C extends ClientPort> {
-	private clients: {[uid: string]: C} = {};
+    private clients: { [uid: string]: C } = {};
 
-	constructor(from?: C[]) {
-		if (from)
-			for (let client of from)
-				this.add(client);
-	}
+    constructor(from?: C[]) {
+        if (from) {
+            for (const client of from) {
+                this.add(client);
+            }
+        }
+    }
 
-	add(client: C) {
-		this.clients[client.uid] = client;
-	}
+    get size(): number {
+        return Object.keys(this.clients).length;
+    }
 
-	remove(client: C) {
-		delete this.clients[client.uid];
-	}
+    add(client: C) {
+        this.clients[client.uid] = client;
+    }
 
-	has(client: C): boolean {
-		return !!this.clients[client.uid];
-	}
+    remove(client: C) {
+        delete this.clients[client.uid];
+    }
 
-	each(callback: (client: C) => boolean) {
-		for (let uid in this.clients)
-			if (!callback(this.clients[uid]))
-				return false;
+    has(client: C): boolean {
+        return !!this.clients[client.uid];
+    }
 
-		return true;
-	}
+    each(callback: (client: C) => boolean) {
+        for (const uid in this.clients) {
+            if (!callback(this.clients[uid])) {
+                return false;
+            }
+        }
 
-	filter(callback) {
-		let client, all = [];
+        return true;
+    }
 
-		for (let uid in this.clients)
-			if (callback(client = this.clients[uid]))
-				all.push(client);
+    filter(callback) {
+        const all: C[] = [];
 
-		return new (<any>this.constructor)(all);
-	}
+        for (const uid in this.clients) {
+            let client;
 
+            if (callback((client = this.clients[uid]))) {
+                all.push(client);
+            }
+        }
+
+        return new (<any>this.constructor)(all);
+    }
 }

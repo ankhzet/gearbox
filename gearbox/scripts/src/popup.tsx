@@ -1,18 +1,12 @@
+import React from 'react';
+import * as ReactDOM from 'react-dom';
 
-import "jquery";
+import 'bootstrap';
+import 'bootstrap/dist/css/bootstrap.css';
+import 'alertifyjs/build/css/alertify.css';
 
-import "bootstrap";
-import "bootstrap/dist/css/bootstrap.css";
+import '../../styles/main.css';
 
-import "../../styles/main.css";
+import { Popup } from './components';
 
-import * as React from "react";
-import * as ReactDOM from "react-dom";
-
-import { Popup } from "./components/popup/popup";
-
-
-ReactDOM.render(
-	<Popup />,
-	document.getElementById("app")
-);
+ReactDOM.render(<Popup />, document.getElementById('app'));

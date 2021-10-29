@@ -1,47 +1,44 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
 
-import * as React from 'react';
-
-import { Plugin } from '../../../core/plugin';
-import { Manager } from './manager';
-
-import { Link } from 'react-router'
-import { Plugins } from '../plugins';
+import { Plugin, PluginManager } from '../../../gearbox';
+import { PluginsRouting } from '../pluginsRouting';
 
 export interface ShowPluginItemProps {
-	manager: Manager<Plugin>;
-	plugin: Plugin;
+    manager: PluginManager;
+    plugin: Plugin;
 }
 
-export class ShowPluginItem extends React.Component<ShowPluginItemProps, {}> {
+export class ShowPluginItem extends React.Component<ShowPluginItemProps> {
+    // async pullPlugin(id: string) {
+    // 	this.setState({
+    // 		plugin: null,
+    // 	});
+    //
+    // 	let plugin = await this.props.manager.get(id);
+    // 	this.setState({
+    // 		plugin: plugin,
+    // 	});
+    // }
+    //
+    // UNSAFE_componentWillReceiveProps(next) {
+    // 	this.pullPlugin(next.params.id);
+    // }
+    //
+    // UNSAFE_componentWillMount() {
+    // 	this.pullPlugin(this.props.params.id);
+    // }
 
-	// async pullPlugin(id: string) {
-	// 	this.setState({
-	// 		plugin: null,
-	// 	});
-  //
-	// 	let plugin = await this.props.manager.get(id);
-	// 	this.setState({
-	// 		plugin: plugin,
-	// 	});
-	// }
-  //
-	// componentWillReceiveProps(next) {
-	// 	this.pullPlugin(next.params.id);
-	// }
-  //
-	// componentWillMount() {
-	// 	this.pullPlugin(this.props.params.id);
-	// }
+    render() {
+        // if (!this.state.plugin)
+        // 	return null;
 
-	render() {
-		// if (!this.state.plugin)
-		// 	return null;
-
-		return (
-			<div className="plugin">
-				<Link to={ Plugins.PATH + '/' + this.props.plugin.uid }>Plugin "{ this.props.plugin.title }"</Link>
-			</div>
-		);
-	}
-
+        return (
+            <div className="plugin">
+                <Link to={PluginsRouting.PATH + '/' + this.props.plugin.uid}>
+                    Plugin &quot;{this.props.plugin.title}&quot;
+                </Link>
+            </div>
+        );
+    }
 }

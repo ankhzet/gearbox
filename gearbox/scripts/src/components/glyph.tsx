@@ -1,16 +1,11 @@
-
-import * as React from "react";
+import React from 'react';
 
 export interface GlyphProps {
-	name: string;
+    name: string;
 }
 
 export class Glyph extends React.Component<GlyphProps, {}> {
-
-	render() {
-		return (
-			<span className={ `glyphicon glyphicon-${this.props.name}` } />
-		);
-	}
-
+    render() {
+        return <span className={`glyphicon glyphicon-${this.props.name}`} />;
+    }
 }

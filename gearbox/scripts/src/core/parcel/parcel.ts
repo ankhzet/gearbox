@@ -1,124 +1,130 @@
-
 import { Port } from './port';
-import { Actions, ActionsRepository } from './actions/actions';
-import { PacketDispatcher, ActionHandler, PacketHandler } from './dispatcher';
 import { Packet } from './packet';
-import { ActionConstructor } from './actions/action';
-import { ConnectAction, ConnectPacketData } from './actions/connect';
+import { PacketDispatcher, ActionHandler, PacketHandler } from './dispatcher';
+import { Actions, ActionsRepository, ActionConstructor, ConnectAction, ConnectPacketData } from './actions';
 
 export class ClientPort extends Port {
-	tabId: number;
+    tabId?: number;
 
-	uid: string = `${Math.random()}`;
-	touched: number = 0;
-	dispatcher: PacketDispatcher = new PacketDispatcher(Actions);
+    uid = `${Math.random()}`;
+    touched = 0;
+    dispatcher: PacketDispatcher = new PacketDispatcher(Actions);
 
-	constructor(name: string, port?: chrome.runtime.Port) {
-		super(name);
-		this.on(ConnectAction, this.connectable);
+    constructor(name: string, port?: chrome.runtime.Port) {
+        super(name);
 
-		this.rebind(port);
-		if (!port)
-			this.connect();
-	}
+        this.on(ConnectAction, this.connectable);
+        this.rebind(port);
 
-	disconnect() {
-		if (this.port)
-			this.port.disconnect();
-	}
+        if (!port) {
+            this.connect();
+        }
+    }
 
-	rebind(port?: chrome.runtime.Port) {
-		return this.bind(port || chrome.runtime.connect({ name: this.name }));
-	}
+    disconnect() {
+        this.port && this.port.disconnect();
+    }
 
-	connect() {
-		return Actions.connect(this, { uid: this.uid });
-	}
+    rebind(port?: chrome.runtime.Port) {
+        return this.bind(port || chrome.runtime.connect({ name: this.name }));
+    }
 
-	bind(port) {
-		if (!port)
-			return;
+    connect() {
+        return Actions.connect(this, { uid: this.uid });
+    }
 
-		port.onMessage.addListener(this.process.bind(this));
-		port.onDisconnect.addListener(() => { this.port = null; });
-		return this.port = port;
-	}
+    bind(port) {
+        if (!port) {
+            return;
+        }
 
-	on<T, H>(action: ActionConstructor<T>, handler: ActionHandler<T, H>): this {
-		return this.dispatcher.bind(this, { handler, action });
-	}
+        port.onMessage.addListener(this.process.bind(this));
+        port.onDisconnect.addListener(() => {
+            this.port = null;
+        });
 
-	send(action, data?, error?) {
-		if (!this.port)
-			return;
+        return (this.port = port);
+    }
 
-		let packet = {
-			sender: this.uid,
-			action: action,
-			data: data,
-			error: null,
-		};
+    on<T, H>(action: ActionConstructor<T> | null, handler: ActionHandler<T, H>): this {
+        return this.dispatcher.bind(this, { handler, action });
+    }
 
-		if (error)
-			packet.error = error;
+    send(action, data?, error?) {
+        if (!this.port) {
+            return;
+        }
 
-		this.port.postMessage(packet);
-	}
+        const packet = {
+            sender: this.uid,
+            action: action,
+            data: data,
+            error: null,
+        };
 
-	process(packet: Packet<any>) {
-		console.log(arguments);
-		this.touched = +new Date;
-		if (this.dispatcher.dispatch(this, packet))
-			if (packet.error)
-				Actions.send(this, { what: 'error', data: packet });
-	}
+        if (error) {
+            packet.error = error;
+        }
 
-	connectable(sender, { uid }, packet: Packet<ConnectPacketData>) {
-		this.uid = uid;
-	}
+        this.port.postMessage(packet);
+    }
 
+    process(packet: Packet) {
+        // eslint-disable-next-line prefer-rest-params
+        console.log(arguments);
+        this.touched = +new Date();
+
+        if (this.dispatcher.dispatch(this, packet)) {
+            if (packet.error) {
+                Actions.send(this, { what: 'error', data: packet });
+            }
+        }
+    }
+
+    connectable(sender, { uid }, packet: Packet<ConnectPacketData>) {
+        this.uid = uid;
+    }
 }
 
 type ClientFactory<C extends ClientPort> = (port: chrome.runtime.Port) => C;
 
 export abstract class ServerPort<C extends ClientPort> extends Port implements PacketHandler<C> {
-	private factory: ClientFactory<C>;
-	private dispatcher: PacketDispatcher;
+    private readonly factory: ClientFactory<C>;
+    private dispatcher: PacketDispatcher;
 
-	constructor(name: string, repository: ActionsRepository, factory: ClientFactory<C>) {
-		super(name);
-		this.factory = factory;
-		this.dispatcher = new PacketDispatcher(repository);
+    protected constructor(name: string, repository: ActionsRepository, factory: ClientFactory<C>) {
+        super(name);
+        this.factory = factory;
+        this.dispatcher = new PacketDispatcher(repository);
 
-		chrome.runtime.onConnect.addListener((port) => {
-			if (port.name === this.name) {
-				let client = this.connect(port);
-				if (client) {
-					if (port.sender.tab)
-						client.tabId = port.sender.tab.id;
+        chrome.runtime.onConnect.addListener((port) => {
+            if (port.name === this.name) {
+                const client = this.connect(port);
 
-					port.onDisconnect.addListener(() => {
-						this.disconnect(client);
-					});
-				}
-			}
-		});
-	}
+                if (client) {
+                    if (port.sender?.tab) {
+                        client.tabId = port.sender.tab.id;
+                    }
 
-	connect(port: chrome.runtime.Port): C {
-		let client = this.factory(port);
+                    port.onDisconnect.addListener(() => {
+                        this.disconnect(client);
+                    });
+                }
+            }
+        });
+    }
 
-		return client.on(null, (sender: C, data: any, packet: Packet<any>) => {
-			return this.dispatcher.dispatch(client, packet);
-		});
-	}
+    connect(port: chrome.runtime.Port): C {
+        const client = this.factory(port);
 
-	disconnect(client: C) {
-	}
+        return client.on(null, (sender: C, data: any, packet: Packet) => {
+            return this.dispatcher.dispatch(client, packet);
+        });
+    }
 
-	on<T>(action: ActionConstructor<T>, handler: ActionHandler<T, C>): this {
-		return this.dispatcher.bind(this, { action, handler });
-	}
+    disconnect(client: C) {}
 
+    on<T>(action: ActionConstructor<T>, handler: ActionHandler<T, C>): this {
+        return this.dispatcher.bind(this, { action, handler });
+    }
 }
-

@@ -1,20 +1,12 @@
+import React from 'react';
+import { Route } from 'react-router';
 
-import * as React from "react";
-import { Route } from 'react-router'
+export class About extends React.Component {
+    static PATH = '/about';
 
-export class About extends React.Component<{}, {}> {
-
-	static PATH = '/about';
-
-	render() {
-		return (
-			<div>
-				This is about page.
-			</div>
-		)
-	}
+    render() {
+        return <div>This is about page.</div>;
+    }
 }
 
-export const AboutRoutes = [
-	<Route path={ About.PATH } component={ About } />
-];
+export const AboutRoutes = [<Route key={About.PATH} path={About.PATH} component={About} />];

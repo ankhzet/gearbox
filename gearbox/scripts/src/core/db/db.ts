@@ -1,84 +1,83 @@
+import DataStoreBase from 'nedb-promises';
 
-import * as DataStore from 'nedb';
+type DataStore = DataStoreBase;
+
+export type { DataStore };
+
+type EraseReturn<T, R = void> = T extends (...args: infer A) => any ? (...args: A) => R : never;
 
 export class DB {
-	protected tables: {[table: string]: DataStore} = {};
+    protected tables: { [table: string]: DataStore } = {};
 
-	constructor() {
-	}
+    table(name: string): DataStore {
+        let table = this.tables[name];
 
-	table(name: string, callback?: (error: Error) => void): DataStore {
-		let table = this.tables[name];
+        if (!table) {
+            table = this.tables[name] = DataStoreBase.create({
+                filename: DB.tableDB(name),
+                autoload: true,
+            });
+        }
 
-		if (!table) {
-			table = this.tables[name] = new DataStore({
-				filename: DB.tableDB(name),
-				autoload: !callback
-			});
+        return table;
+    }
 
-			if (callback)
-				table.loadDatabase(callback);
-		}
+    static tableDB(name: string) {
+        return `gearbox/${name}.db`;
+    }
 
-		return table;
-	}
+    scheme(table: string, callback: (blueprint: { index: EraseReturn<DataStoreBase['ensureIndex']> }) => void) {
+        const db = this.table(table);
 
-	static tableDB(name: string) {
-		return `gearbox/${name}.db`;
-	}
+        return callback({
+            index(options) {
+                void db.ensureIndex(options);
+            },
+        });
+    }
 
-	scheme(table: string, callback) {
-		let db = this.table(table);
-
-		return callback({
-			index(options, cb) {
-				return db.ensureIndex(options, cb);
-			}
-		});
-	}
-
-	query(what: string, query?: any) {
-		return new Query(this, what, query);
-	}
-
+    query<Q>(what: string, query?: Q) {
+        return new Query<Q>(this, what, query);
+    }
 }
 
-export class Query {
-	private db: DB;
-	private what: string;
-	private query: any;
+export class Query<Q> {
+    private readonly db: DB;
+    private readonly what: string;
+    private readonly query?: Q;
 
-	constructor(db: DB, what: string, query: any) {
-		this.db = db;
-		this.what = what;
-		this.query = query;
-	}
+    constructor(db: DB, what: string, query?: Q) {
+        this.db = db;
+        this.what = what;
+        this.query = query;
+    }
 
-	hasQuery(): boolean {
-		return !!(this.query && Object.keys(this.query).length);
-	}
+    hasQuery(): boolean {
+        return !!(this.query && Object.keys(this.query).length);
+    }
 
-	specific(what: string[], callback: (cursor: DataStore) => any): Query {
-		let hasQuery = this.hasQuery();
-		let isSpecific = (!what) || (what.indexOf(this.what) >= 0);
+    specific(what: string[] | null, callback: (cursor: DataStore) => any): this {
+        const hasQuery = this.hasQuery();
+        const isSpecific = !what || what.indexOf(this.what) >= 0;
 
-		if (isSpecific && !hasQuery) {
-			callback(this.cursor());
-			return new Query(this.db, this.what, null);
-		}
+        if (isSpecific && !hasQuery) {
+            callback(this.cursor());
 
-		return this;
-	}
+            return new Query(this.db, this.what, null) as any;
+        }
 
-	cursor(): DataStore {
-		return this.db.table(this.what);
-	}
+        return this;
+    }
 
-	fetch<T>(callback: (err: Error, documents: T[]) => any): Query {
-		if (this.query)
-			this.cursor().find(this.query, callback);
+    cursor(): DataStore {
+        return this.db.table(this.what);
+    }
 
-		return this;
-	}
+    async fetch<T>(): Promise<T[]> {
+        if (this.query) {
+            return this.cursor().find(this.query);
+        }
 
+        return [];
+    }
 }
