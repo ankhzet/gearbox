@@ -1,9 +1,8 @@
 import { Packet } from './packet';
-import { ActionsRepository } from './actions';
-import { ActionConstructor } from './actions';
+import { ActionConstructor, ActionsRepository } from './actions';
 
-export type ActionHandler<T, S> = (sender: S, data: T, packet: Packet<T>) => any;
-export type DispatchHandler<T, S> = (sender: S, packet: Packet<T>) => any;
+export type ActionHandler<T, S> = (sender: S, data: T, packet: Packet<T>) => void;
+export type DispatchHandler<T, S> = (sender: S, packet: Packet<T>) => void;
 export type PacketHandlerDescriptor<T, S> = { handler: ActionHandler<T, S>; action?: ActionConstructor<T> | null };
 
 export interface PacketDispatchDelegate<T> {
@@ -33,16 +32,14 @@ export class PacketDispatcher implements PacketDispatchDelegate<any> {
             return context;
         }
 
-        const descriptor = <PacketHandlerDescriptor<T, S>>descriptors;
-        const method = descriptor.handler;
+        const method = descriptors.handler;
         let name = PacketDispatcher.DEFAULT;
         let handler;
 
-        if (descriptor.action) {
-            name = descriptor.action.uid;
+        if (descriptors.action) {
+            const action = this.repository.get(descriptors.action);
 
-            const action = this.repository.get(descriptor.action);
-
+            name = descriptors.action.uid;
             handler = function (sender: S, packet) {
                 return method.call(context, sender, action.unpack(packet.data), packet);
             };

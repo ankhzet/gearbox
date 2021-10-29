@@ -1,4 +1,5 @@
-import { ClientPort } from './parcel';
+import { ClientPort } from './client-port';
+import { Action, ActionPerformer } from './actions';
 
 export class ClientsPool<C extends ClientPort> {
     private clients: { [uid: string]: C } = {};
@@ -27,7 +28,17 @@ export class ClientsPool<C extends ClientPort> {
         return !!this.clients[client.uid];
     }
 
-    each(callback: (client: C) => boolean) {
+    find(predicate: (client: C) => boolean): C | void {
+        for (const uid in this.clients) {
+            const client = this.clients[uid];
+
+            if (!predicate(client)) {
+                return client;
+            }
+        }
+    }
+
+    each(callback: (client: C) => boolean): boolean {
         for (const uid in this.clients) {
             if (!callback(this.clients[uid])) {
                 return false;
@@ -37,7 +48,7 @@ export class ClientsPool<C extends ClientPort> {
         return true;
     }
 
-    filter(callback) {
+    filter(callback: (client: C) => boolean): this {
         const all: C[] = [];
 
         for (const uid in this.clients) {
@@ -49,5 +60,11 @@ export class ClientsPool<C extends ClientPort> {
         }
 
         return new (<any>this.constructor)(all);
+    }
+
+    broadcast<T>(action: ActionPerformer<T, Action<T>>, data: T, error?: string): boolean {
+        return this.each((client) => {
+            return action(client, data, error);
+        });
     }
 }

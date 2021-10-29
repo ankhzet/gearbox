@@ -1,25 +1,21 @@
-
 export class Eventable {
-	private _handlers: {[event: string]: Function[]} = {};
+    private _handlers: { [event: string]: Function[] } = {};
 
-	on(event, handler) {
+    on(event, handler) {
+        (this._handlers[event] || (this._handlers[event] = [])).push(handler);
+    }
 
-		let handlers = this._handlers[event];
-		if (!handlers)
-			handlers = this._handlers[event] = [];
+    fire(event: string, ...payload: any[]) {
+        // console.log(`firing [${event}] with`, payload, 'for', this);
+        const args = [event, ...payload];
+        const handlers = this._handlers[event];
 
-		handlers.push(handler);
-	}
+        if (!handlers) {
+            return;
+        }
 
-	fire(event: string, ...payload: any[]) {
-		// console.log(`firing [${event}] with`, payload, 'for', this);
-		let args = [event, ...payload];
-		let handlers = this._handlers[event];
-		if (!handlers)
-			return;
-
-		for (let handler of handlers.slice())
-			handler.apply(this, args);
-	}
-
+        for (const handler of handlers.slice()) {
+            handler.apply(this, args);
+        }
+    }
 }

@@ -1,13 +1,15 @@
 import { ClientPort, Packet } from './core';
 import { GearBoxActions, ExecuteAction, ExecutePacketData } from './gearbox';
 
-class ConnectorChannel extends ClientPort {
+class ContentfullChannel extends ClientPort {
     constructor() {
-        super('gearbox-content');
-        this.on(ExecuteAction, this.executed.bind(this));
+        super('gearbox-content', window.location.href);
+        this.on(ExecuteAction, this.executed);
 
         if (!this.rebind()) {
             throw new Error('Failed to connect to background script');
+        } else {
+            this.connect();
         }
     }
 
@@ -73,4 +75,4 @@ class ConnectorChannel extends ClientPort {
             checker();
         };
     }
-})(new ConnectorChannel(), 60 * 1000);
+})(new ContentfullChannel(), 30 * 1000);

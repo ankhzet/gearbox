@@ -1,7 +1,5 @@
 import { DB, DataStore } from '../core';
 
-export { ModelStore, SyncResult } from '../core';
-
 export class GearboxDB extends DB {
     constructor() {
         super();

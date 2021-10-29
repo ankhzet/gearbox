@@ -1,7 +1,8 @@
-import { Identifiable, SendAction, SendPacketData } from '../core';
+import { Identifiable } from '../core';
 import { Plugin } from './plugin';
-import { ClientConnector } from './client-connector';
+import { ClientConnector } from './client';
 import { ObservableList, Package } from './observable-list';
+import { GearBoxActions } from './actions';
 
 export interface Manager<T extends Identifiable, A> {
     get(uids?: string[]): Promise<Package<T>>;
@@ -11,19 +12,24 @@ export interface Manager<T extends Identifiable, A> {
 }
 
 abstract class ObservableConnectedList<T extends Identifiable> extends ObservableList<T> {
+    private readonly resolver: { [request: number]: (any) => void } = [];
+    private readonly collection: string;
     protected connector: ClientConnector;
-    private resolver: { [request: number]: (any) => void } = [];
     private request = 0;
 
-    constructor() {
+    constructor(collection: string, connector: ClientConnector) {
         super();
+        this.collection = collection;
+        this.connector = connector;
+        this.connector.onsent((sender, { what, data, payload }) => {
+            if (what !== this.collection) {
+                return;
+            }
 
-        this.connector = new ClientConnector();
-        this.connector.on(SendAction, (sender, data: SendPacketData) => {
-            const resolver = this.resolver[data.payload];
-            delete this.resolver[data.payload];
+            const resolver = this.resolver[payload];
+            delete this.resolver[payload];
 
-            resolver(data.data);
+            resolver(data);
         });
     }
 
@@ -32,7 +38,7 @@ abstract class ObservableConnectedList<T extends Identifiable> extends Observabl
             const uid = this.request++;
             this.resolver[uid] = resolve;
 
-            this.connector.fetch(uids.length ? { uid: { $in: uids } } : {}, uid);
+            this.connector.fetch(this.collection, uids.length ? { uid: { $in: uids } } : {}, uid);
         });
     }
 
@@ -41,7 +47,7 @@ abstract class ObservableConnectedList<T extends Identifiable> extends Observabl
             const uid = this.request++;
             this.resolver[uid] = resolve;
 
-            this.connector.update(pack, uid);
+            this.connector.update(this.collection, pack, uid);
         });
     }
 }
@@ -49,18 +55,30 @@ abstract class ObservableConnectedList<T extends Identifiable> extends Observabl
 type PluginAction = 'execute' | 'fire';
 
 export class PluginManager extends ObservableConnectedList<Plugin> implements Manager<Plugin, PluginAction> {
+    execute(uid: string, code?: string) {
+        return GearBoxActions.execute(this.connector, { plugin: { uid: uid }, code });
+    }
+
+    fire(sender: string, event: string) {
+        return GearBoxActions.fire(this.connector, { sender, event });
+    }
+
+    unmount(uid: string) {
+        return GearBoxActions.unmount(this.connector, { uid });
+    }
+
     public perform<T>(uids: string[], action: PluginAction, payload?: T) {
         return this.get(uids).then((pack) => {
             for (const uid in pack) {
                 switch (action) {
                     case 'execute': {
-                        this.connector.execute(uid);
+                        this.execute(uid);
                         break;
                     }
 
                     case 'fire': {
                         console.log(`performing ${action}(${payload}) on '${uid}'`);
-                        this.connector.fire(uid, payload as unknown as string);
+                        this.fire(uid, payload as unknown as string);
                         break;
                     }
                 }

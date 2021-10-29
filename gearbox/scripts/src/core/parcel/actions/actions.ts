@@ -1,4 +1,3 @@
-import { ClientPort } from '../parcel';
 import { ActionConstructor, Action } from './action';
 
 import { ConnectPacketData, ConnectAction } from './impl';
@@ -6,11 +5,12 @@ import { FetchPacketData, FetchAction } from './impl';
 import { SendPacketData, SendAction } from './impl';
 import { UpdatePacketData, UpdateAction } from './impl';
 import { FirePacketData, FireAction } from './impl';
+import { ClientPort } from '../client-port';
 
-export type ActionPerformer<T, A extends Action<T>> = (port: ClientPort, data?: T, error?: string) => any;
+export type ActionPerformer<T, A extends Action<T>> = (port: ClientPort, data?: T, error?: string) => boolean;
 
 export interface ActionsRepository {
-    get<T>(constructor: ActionConstructor<T>);
+    get<T>(constructor: ActionConstructor<T>): Action<T>;
 }
 
 class BaseActions {
@@ -38,7 +38,7 @@ class BaseActions {
 
         const action = this._registry[name];
 
-        return (this._cache[name] = action.send.bind(action));
+        return (this._cache[name] = action.send);
     }
 }
 

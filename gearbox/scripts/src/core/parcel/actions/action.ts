@@ -1,4 +1,4 @@
-import { ClientPort } from '../parcel';
+import { ClientPort } from '../client-port';
 
 export interface ActionConstructor<T> {
     new (): Action<T>;
@@ -6,10 +6,6 @@ export interface ActionConstructor<T> {
 }
 
 export class Action<T> {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    static name: string;
-
     properties: string[] = ['error'];
 
     public pack(data): T {
@@ -26,9 +22,7 @@ export class Action<T> {
         // return <T>this.properties.map((prop) => data[prop]);
     }
 
-    send(port: ClientPort, data?, error?) {
-        return port.send(this.uid, this.pack(data), error);
-    }
+    public send = (port: ClientPort, data?, error?): boolean => port.send(this.uid, this.pack(data), error);
 
     get uid() {
         return (<any>this.constructor).uid;

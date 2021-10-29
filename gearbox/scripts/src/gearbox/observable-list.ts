@@ -25,6 +25,7 @@ export abstract class ObservableList<T extends Identifiable> {
         // split requested invalid uids to 'already loaded' and 'invalidated' groups
         const ready: string[] = [];
         const load: string[] = [];
+
         for (const uid of uids) {
             if (this.data[uid]) {
                 ready.push(uid);
@@ -44,6 +45,7 @@ export abstract class ObservableList<T extends Identifiable> {
         // console.log(`result`, result);
 
         let final;
+
         if (load.length) {
             // split requested invalid uids to 'already pending' and 'just invalidated' groups
             const fetching = this.fetching();

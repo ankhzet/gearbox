@@ -9,4 +9,8 @@ export abstract class Port {
     static portName(port: string): string {
         return `${port}-data-channel`;
     }
+
+    static specifier(name: string): string {
+        return name.replace(/-data-channel$/, '');
+    }
 }

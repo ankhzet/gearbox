@@ -25,8 +25,8 @@ export class PluginsDepot<C = any> extends PluginList<Plugin> {
         return this.mountPoint.unmount(this.context, plugin);
     }
 
-    public load(data: Identifiable[]): PluginsPackage {
-        const result: PluginsPackage = {};
+    public load(data: Identifiable[]): Package<Plugin> {
+        const result: Package<Plugin> = {};
 
         for (const fragment of data) {
             result[fragment.uid] = this.pluginFromData(fragment);
@@ -51,5 +51,3 @@ export class PluginsDepot<C = any> extends PluginList<Plugin> {
         return plugin;
     }
 }
-
-export type PluginsPackage = Package<Plugin>;

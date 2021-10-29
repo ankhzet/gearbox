@@ -1,18 +1,18 @@
 import { GearboxDB } from './gearbox-db';
 
 import {
+    Packet,
     ActionConstructor,
     ActionHandler,
     DataServer,
     FireAction,
     FirePacketData,
-    Packet,
     SendAction,
     SendPacketData,
 } from '../core';
 
 import { ExecuteAction, ExecutePacketData, GearBoxActions, UnmountAction, UnmountPacketData } from './actions';
-import { ClientActionHandler, ContentedClientsPool, GearBoxClient, GearBoxServer } from './server';
+import { ClientActionHandler, GearBoxClient, GearBoxServer } from './server';
 import { PluginsDepot } from './plugins-depot';
 import { PluginsProviderHelper } from './plugins-provider-helper';
 
@@ -53,7 +53,7 @@ export class GearBox extends GearBoxServer {
         });
     }
 
-    fire(uid: string, event: string, ...payload: any[]) {
+    fire(uid: string, event: string, ...payload) {
         const instance = this.plugins.instance(uid);
 
         if (instance) {
@@ -62,12 +62,14 @@ export class GearBox extends GearBoxServer {
     }
 
     execute({ uid }, code?: string) {
-        this.clientsInActiveTab((clients: ContentedClientsPool) => {
-            console.log('Clients in active tab:', clients.size);
+        this.clientsInActiveTab((clients) => {
             const instance = this.plugins.instance(uid);
 
             if (instance) {
-                clients.execute(instance.raw(), (code || '').toString());
+                clients.broadcast(GearBoxActions.execute, {
+                    plugin: instance.raw(),
+                    code: (code || '').toString(),
+                });
             }
         });
     }
@@ -108,6 +110,7 @@ export class GearBox extends GearBoxServer {
 
     _handle_execute(client: GearBoxClient, { plugin: data, code }: ExecutePacketData) {
         const plugin = this.plugins.get(data.uid);
+
         if (!plugin) {
             // todo: error handling!
             throw new Error(`Plugin with uid "${data.uid}" not found`);
