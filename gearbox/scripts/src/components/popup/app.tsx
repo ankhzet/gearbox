@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { startCase } from 'lodash';
 
@@ -18,6 +18,22 @@ export const App = ({ children }) => {
             manager,
         };
     }, []);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        connector.onsent((_, { what, data }) => {
+            if (what !== 'error') {
+                return;
+            }
+
+            setError(data);
+
+            setTimeout(() => {
+                setError('');
+            }, 3000);
+        });
+    }, [connector]);
+
     const breadcrumbs = useMemo(() => {
         const parts = location.pathname.split('/').filter(Boolean);
 
@@ -40,6 +56,8 @@ export const App = ({ children }) => {
 
             <div className="col-lg-12">
                 <Breadcrumbs crumbs={breadcrumbs} />
+
+                {error && <div className="col-lg-12 danger">{error}</div>}
 
                 {children}
             </div>
