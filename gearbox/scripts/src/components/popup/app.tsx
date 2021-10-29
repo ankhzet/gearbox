@@ -1,44 +1,48 @@
-import React from 'react';
-import { RouteComponentProps } from 'react-router-dom';
+import React, { useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
+import { startCase } from 'lodash';
 
-import { PluginManager } from '../../gearbox';
+import { ClientConnector, PluginManager } from '../../gearbox';
 import { PluginManagerContext } from '../hooks';
 import { Breadcrumbs } from '../breadcrumbs';
 import { Navbar } from './navbar';
 
-interface AppState {
-    manager: PluginManager;
-}
+export const App = ({ children }) => {
+    const location = useLocation();
+    const { connector, manager } = useMemo(() => {
+        const connector = new ClientConnector();
+        const manager = new PluginManager('plugins', connector);
 
-export class App extends React.Component<RouteComponentProps, AppState> {
-    UNSAFE_componentWillMount() {
-        const manager = new PluginManager();
-        this.setState({
+        return {
+            connector,
             manager,
-        });
-    }
+        };
+    }, []);
+    const breadcrumbs = useMemo(() => {
+        const parts = location.pathname.split('/').filter(Boolean);
 
-    breadcrumbs() {
-        return [
-            { title: 'Plugins', link: '#plugins' },
-            { title: 'Plugin', link: '#plugin/1/' },
-            { title: 'Edit', link: '#plugin/1/edit' },
-        ];
-    }
+        return parts.reduce((acc, part) => {
+            const link = [acc[acc.length - 1]?.link || '', part].join('/');
 
-    render() {
-        const navprops = this.props;
+            if (String(+part) === part) {
+                acc.push({ title: part, link });
+            } else {
+                acc.push({ title: startCase(part), link });
+            }
 
-        return (
-            <PluginManagerContext.Provider value={this.state.manager}>
-                <Navbar {...navprops} />
+            return acc;
+        }, [] as { title: string; link: string }[]);
+    }, [location.pathname]);
 
-                <Breadcrumbs crumbs={this.breadcrumbs()} />
+    return (
+        <PluginManagerContext.Provider value={manager}>
+            <Navbar />
 
-                <div>
-                    <div className="col-lg-12">{this.props.children}</div>
-                </div>
-            </PluginManagerContext.Provider>
-        );
-    }
-}
+            <div className="col-lg-12">
+                <Breadcrumbs crumbs={breadcrumbs} />
+
+                {children}
+            </div>
+        </PluginManagerContext.Provider>
+    );
+};
