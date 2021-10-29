@@ -4,8 +4,11 @@
 node_modules
 ncp-debug.log
 npm-debug.log
-*.js
-*.js.map
-gearbox/styles/**/*.css
 !gearbox/scripts/lib/*
 !webpack.config.js
+.idea
+*.iml
+/dist
+*.js
+*.js.map
+#gearbox/styles/**/*.css

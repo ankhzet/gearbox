@@ -9,11 +9,22 @@
 	},
 	"background": {
 		"scripts": [
+			"scripts/commons.js",
+			"scripts/background.js"
 		]
 	},
 	"content_scripts": [
+		{
+			"matches": ["*://*/*"],
+			"js": ["scripts/commons.js", "scripts/content.js"]
+		}
 	],
 	"permissions": [
+		"background",
+		"notifications",
+		"tabs",
+		"activeTab",
+		"*://*/*"
 	],
 	"browser_action": {
 		"default_icon": {
@@ -21,6 +32,7 @@
 			"38": "images/icon-38.png"
 		},
 		"default_title": "gearbox",
+		"default_popup": "popup.html"
 	},
 	"content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'"
 }
