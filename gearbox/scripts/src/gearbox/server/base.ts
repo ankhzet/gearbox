@@ -9,7 +9,7 @@ export class BaseServer extends ServerPort<GearBoxClient> {
     contented: ContentedClientsPool = new ContentedClientsPool();
 
     constructor() {
-        super('gearbox', GearBoxActions, (port: chrome.runtime.Port) => {
+        super('gearbox-server', GearBoxActions, (port: chrome.runtime.Port) => {
             return new GearBoxClient(port).on(ConnectAction, this.connected.bind(this));
         });
     }
