@@ -74,6 +74,15 @@ export class GearBox extends GearBoxServer {
         });
     }
 
+    error(error: string) {
+        this.clients
+            .filter((client) => !client.tabId)
+            .broadcast(GearBoxActions.send, {
+                what: 'error',
+                data: error,
+            });
+    }
+
     /**
      * Interacting with clients
      */
@@ -89,6 +98,8 @@ export class GearBox extends GearBoxServer {
                     `\t`,
                     payload.error,
                 );
+
+                this.error(payload.error);
                 break;
             }
         }
